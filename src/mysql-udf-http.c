@@ -93,7 +93,7 @@ char *http_get(UDF_INIT *initid, UDF_ARGS *args,
     curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "mysql-udf-http/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "rongkecloud_callback_agent v1.0");
     retref= curl_easy_perform(curl);
     if (retref) {
       fprintf(stderr, "error\n");
@@ -161,17 +161,18 @@ char *http_post(UDF_INIT *initid, UDF_ARGS *args,
   if (curl)
   {
     struct curl_slist *chunk = NULL;
-    chunk = curl_slist_append(chunk, "Expect:");  
+    chunk = curl_slist_append(chunk, "Content-Type: application/json");
   
     curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "mysql-udf-http/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "rongkecloud_callback_agent v1.0");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, args->args[1]);
     retref= curl_easy_perform(curl);
+
     if (retref) {
-      fprintf(stderr, "error\n");
+      fprintf(stderr, "%s%d\n", "error: ", retref);
       if (res->result)
         strcpy(res->result,"");
       res->size = 0;
