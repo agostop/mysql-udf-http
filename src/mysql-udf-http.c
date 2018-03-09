@@ -48,6 +48,86 @@ result_cb(void *ptr, size_t size, size_t nmemb, void *data)
   return realsize;
 }
 
+/* ------------------------HTTP POST----------------------------- */
+
+my_bool http_post_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+{
+ // st_curl_results *container;
+
+  if (args->arg_count != 2)
+  {
+    strncpy(message,
+            "two arguments must be supplied: http_post('<url>','<data>').",
+            MYSQL_ERRMSG_SIZE);
+    return 1;
+  }
+
+  args->arg_type[0]= STRING_RESULT;
+
+  initid->max_length= CURL_UDF_MAX_SIZE;
+  //container= (st_curl_results *)malloc(sizeof(st_curl_results));
+
+  //initid->ptr= (char *)container;
+
+  return 0;
+}
+
+char *http_post(UDF_INIT *initid, UDF_ARGS *args,
+                __attribute__ ((unused)) char *result,
+               unsigned long *length,
+                __attribute__ ((unused)) char *is_null,
+                __attribute__ ((unused)) char *error)
+{
+  CURLcode retref;
+  CURL *curl;
+  //st_curl_results *res= (st_curl_results *)initid->ptr;
+  st_curl_results res;
+
+  curl_global_init(CURL_GLOBAL_ALL);
+  curl= curl_easy_init();
+
+  res.result= NULL;
+  res.size= 0;
+
+  if (curl)
+  {
+    struct curl_slist *chunk = NULL;
+    chunk = curl_slist_append(chunk, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&res);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "rongkecloud_callback_agent v1.0");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, args->args[1]);
+    retref= curl_easy_perform(curl);
+
+    if (retref) {
+      fprintf(stderr, "%s%d\n", "error: ", retref);
+      if (res.result)
+        strcpy(res.result,"");
+      res.size = 0;
+    }
+  }
+  curl_easy_cleanup(curl);
+  *length= res.size;
+
+  initid->ptr = res.result;
+  return res.result;
+}
+
+void http_post_deinit(UDF_INIT *initid)
+{
+  /* if we allocated initid->ptr, free it here */
+  //st_curl_results *res= (st_curl_results *)initid->ptr;
+
+  //if (res->result)
+  //  free(res->result);
+	if (initid->ptr)
+		free(initid->ptr);
+  return;
+}
+
 /* ------------------------HTTP GET----------------------------- */
 
 my_bool http_get_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -64,10 +144,12 @@ my_bool http_get_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 
   args->arg_type[0]= STRING_RESULT;
 
+  /*
   initid->max_length= CURL_UDF_MAX_SIZE;
   container= (st_curl_results *)malloc(sizeof(st_curl_results));
 
   initid->ptr= (char *)container;
+  */
 
   return 0;
 }
@@ -80,117 +162,46 @@ char *http_get(UDF_INIT *initid, UDF_ARGS *args,
 {
   CURLcode retref;
   CURL *curl;
-  st_curl_results *res= (st_curl_results *)initid->ptr;
+  //st_curl_results *res= (st_curl_results *)initid->ptr;
+  st_curl_results res;
 
   curl_global_init(CURL_GLOBAL_ALL);
   curl= curl_easy_init();
 
-  res->result= NULL;
-  res->size= 0;
+  res.result= NULL;
+  res.size= 0;
 
   if (curl)
   {
     curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&res);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "rongkecloud_callback_agent v1.0");
     retref= curl_easy_perform(curl);
     if (retref) {
       fprintf(stderr, "error\n");
-      if (res->result) 
-        strcpy(res->result,"");
-      res->size = 0;
+      if (res.result)
+        strcpy(res.result,"");
+      res.size = 0;
     }
   }
   curl_easy_cleanup(curl);
-  *length= res->size;
-  return ((char *) res->result);
+  *length= res.size;
+  initid->ptr = res.result;
+  return res.result;
 }
 
 void http_get_deinit(UDF_INIT *initid)
 {
   /* if we allocated initid->ptr, free it here */
+	/*
   st_curl_results *res= (st_curl_results *)initid->ptr;
 
   if (res->result)
         free(res->result);
-  free(res);
-  return;
-}
-
-/* ------------------------HTTP POST----------------------------- */
-
-my_bool http_post_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
-{
-  st_curl_results *container;
-
-  if (args->arg_count != 2)
-  {
-    strncpy(message,
-            "two arguments must be supplied: http_post('<url>','<data>').",
-            MYSQL_ERRMSG_SIZE);
-    return 1;
-  }
-
-  args->arg_type[0]= STRING_RESULT;
-
-  initid->max_length= CURL_UDF_MAX_SIZE;
-  container= (st_curl_results *)malloc(sizeof(st_curl_results));
-
-  initid->ptr= (char *)container;
-
-  return 0;
-}
-
-char *http_post(UDF_INIT *initid, UDF_ARGS *args,
-                __attribute__ ((unused)) char *result,
-               unsigned long *length,
-                __attribute__ ((unused)) char *is_null,
-                __attribute__ ((unused)) char *error)
-{
-  CURLcode retref;
-  CURL *curl;
-  st_curl_results *res= (st_curl_results *)initid->ptr;
-
-  curl_global_init(CURL_GLOBAL_ALL);
-  curl= curl_easy_init();
-
-  res->result= NULL;
-  res->size= 0;
-
-  if (curl)
-  {
-    struct curl_slist *chunk = NULL;
-    chunk = curl_slist_append(chunk, "Content-Type: application/json");
-  
-    curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "rongkecloud_callback_agent v1.0");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, args->args[1]);
-    retref= curl_easy_perform(curl);
-
-    if (retref) {
-      fprintf(stderr, "%s%d\n", "error: ", retref);
-      if (res->result)
-        strcpy(res->result,"");
-      res->size = 0;
-    }
-  }
-  curl_easy_cleanup(curl);
-  *length= res->size;
-  return ((char *) res->result);
-}
-
-void http_post_deinit(UDF_INIT *initid)
-{
-  /* if we allocated initid->ptr, free it here */
-  st_curl_results *res= (st_curl_results *)initid->ptr;
-
-  if (res->result)
-    free(res->result);
-  free(res);
+        */
+	if (initid->ptr)
+		free(initid->ptr);
   return;
 }
 
@@ -210,10 +221,12 @@ my_bool http_put_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 
   args->arg_type[0]= STRING_RESULT;
 
+  /*
   initid->max_length= CURL_UDF_MAX_SIZE;
   container= (st_curl_results *)malloc(sizeof(st_curl_results));
 
   initid->ptr= (char *)container;
+  */
 
   return 0;
 }
@@ -226,13 +239,14 @@ char *http_put(UDF_INIT *initid, UDF_ARGS *args,
 {
   CURLcode retref;
   CURL *curl;
-  st_curl_results *res= (st_curl_results *)initid->ptr;
+  //st_curl_results *res= (st_curl_results *)initid->ptr;
+  st_curl_results res;
 
   curl_global_init(CURL_GLOBAL_ALL);
   curl= curl_easy_init();
 
-  res->result= NULL;
-  res->size= 0;
+  res.result= NULL;
+  res.size= 0;
 
   if (curl)
   {
@@ -241,7 +255,7 @@ char *http_put(UDF_INIT *initid, UDF_ARGS *args,
   
     curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&res);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "mysql-udf-http/1.0");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
@@ -249,24 +263,29 @@ char *http_put(UDF_INIT *initid, UDF_ARGS *args,
     retref= curl_easy_perform(curl);
     if (retref) {
       fprintf(stderr, "error\n");
-      if (res->result)
-        strcpy(res->result,"");
-      res->size = 0;
+      if (res.result)
+        strcpy(res.result,"");
+      res.size = 0;
     }
   }
   curl_easy_cleanup(curl);
-  *length= res->size;
-  return ((char *) res->result);
+  *length= res.size;
+  initid->ptr = res.result;
+  return res.result;
 }
 
 void http_put_deinit(UDF_INIT *initid)
 {
   /* if we allocated initid->ptr, free it here */
+	/*
   st_curl_results *res= (st_curl_results *)initid->ptr;
 
   if (res->result)
     free(res->result);
   free(res);
+  */
+	if (initid->ptr)
+		free(initid->ptr);
   return;
 }
 
@@ -286,10 +305,12 @@ my_bool http_delete_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 
   args->arg_type[0]= STRING_RESULT;
 
+  /*
   initid->max_length= CURL_UDF_MAX_SIZE;
   container= (st_curl_results *)malloc(sizeof(st_curl_results));
 
   initid->ptr= (char *)container;
+  */
 
   return 0;
 }
@@ -302,41 +323,46 @@ char *http_delete(UDF_INIT *initid, UDF_ARGS *args,
 {
   CURLcode retref;
   CURL *curl;
-  st_curl_results *res= (st_curl_results *)initid->ptr;
+  //st_curl_results *res= (st_curl_results *)initid->ptr;
+  st_curl_results res;
 
   curl_global_init(CURL_GLOBAL_ALL);
   curl= curl_easy_init();
 
-  res->result= NULL;
-  res->size= 0;
+  res.result= NULL;
+  res.size= 0;
 
   if (curl)
   { 
     curl_easy_setopt(curl, CURLOPT_URL, args->args[0]);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, result_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)res);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&res);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "mysql-udf-http/1.0");
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     retref= curl_easy_perform(curl);
     if (retref) {
       fprintf(stderr, "error\n");
-      if (res->result)
-        strcpy(res->result,"");
-      res->size = 0;
+      if (res.result)
+        strcpy(res.result,"");
+      res.size = 0;
     }
   }
   curl_easy_cleanup(curl);
-  *length= res->size;
-  return ((char *) res->result);
+  *length= res.size;
+  initid->ptr = res.result;
+  return res.result;
 }
 
 void http_delete_deinit(UDF_INIT *initid)
 {
   /* if we allocated initid->ptr, free it here */
+/*
   st_curl_results *res= (st_curl_results *)initid->ptr;
-
   if (res->result)
     free(res->result);
   free(res);
+  */
+  if (initid->ptr)
+	  free(initid->ptr);
   return;
 }
